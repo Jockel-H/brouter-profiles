@@ -423,6 +423,8 @@ assign classifiermask add     isbadoneway
            add multiply islinktype   8
              multiply isgoodforcars 16
 
+assign iswayreverse = reversedirection=yes # In use for stop, give_way, traffic_signals :direction
+
 
 
 ---context:node # following code refers to node tags
@@ -459,9 +461,18 @@ assign footaccess
  1
 
 assign initialcost
- add switch highway=traffic_signals 250 # Kosten für Ampel
-  switch highway=stop 200 # Kosten für Stoppschild
-  switch highway=give_way 100 # Kosten für Vorfahrt gewähren
+ add switch highway=traffic_signals
+  switch and not way:oneway and not traffic_signals:direction=both and not traffic_signals:direction= not xor way:iswayreverse traffic_signals:direction=forward 0 # Oneway|Direction=both|Direction=<empty>? Then always count. Not in driving direction? Then no cost
+   499 # Standard Kosten für Ampel
+  switch highway=stop
+   # ToDo: include stop:direction
+   switch and not way:oneway and not direction=both and not direction=  not xor way:iswayreverse direction=forward 0 # Oneway|Direction=both|Direction=<empty>? Then always count. Not in driving direction? Then no cost
+   800 # Kosten für Stoppschild
+  switch highway=give_way
+   # ToDo: include give_way:direction
+   switch and not way:oneway and not direction=both and not direction= not xor way:iswayreverse direction=forward 0 # Oneway|Direction=both|Direction=<empty>? Then always count. Not in driving direction? Then no cost
+   switch way:cycleway 29 # Lower cost on cycleway
+   150 # Kosten für Vorfahrt gewähren
   switch highway=crossing 10 # Kosten für Vorfahrt gewähren
   switch railway=crossing|level_crossing 350 # Kosten für Bahnübergang
   switch highway=steps switch no_steps 1000000 dismount_cost #Kosten für Stufe
