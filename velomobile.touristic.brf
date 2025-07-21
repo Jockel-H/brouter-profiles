@@ -481,7 +481,8 @@ assign initialcost
   switch highway=crossing 10 # Kosten für Vorfahrt gewähren
   switch railway=crossing|level_crossing 350 # Kosten für Bahnübergang
   switch highway=steps switch no_steps 1000000 dismount_cost #Kosten für Stufe
-  switch barrier=cycle_barrier|debris|gate|motorcycle_barrier|yes 50 # Kosten für Barrieren
+  switch barrier=cycle_barrier 1000 # How can one pass such a barrier with a velomobile?
+  switch barrier=debris|gate|motorcycle_barrier|yes 50 # Kosten für Barrieren
   0
  switch bikeaccess
   0 
