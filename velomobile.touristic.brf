@@ -1,21 +1,24 @@
 #
 # Touristic profile for velomobiles, contributed by Jockel Hofmann, based on "Rennrad - wenig Verkehr"
-#  - vermeidet viel stärker Höhenmeter, 
-#  - wählt bergauf kleinere, bergab größere Straßen
-#  - bergab, Abbiegen teuer
-#  - folgt auch durchgehenden, asphaltierten Radrouten @ https://www.velomobilforum.de/forum/index.php?threads/brouter-ein-konfigurierbarer-offline-streckenrouter-web-android.38274/post-1544915
-# Referenzrouten:
+#  - avoids elevation gain much more strongly,
+#  - prefers smaller roads uphill, larger roads downhill
+#  - downhill, turning is expensive
+#  - also follows continuous, paved cycle routes @ https://www.velomobilforum.de/forum/index.php?threads/brouter-ein-konfigurierbarer-offline-streckenrouter-web-android.38274/post-1544915
+# Reference routes:
 # - https://bikerouter.de/#map=12/50.0011/8.0592/standard,Smoothness&lonlats=7.850075,50.009051;8.278885,50.007517&profile=vm-forum-velomobil-touristisch
 # - https://bikerouter.de/#map=11/50.0541/8.5419/standard,Smoothness&lonlats=8.773527,50.107535;8.31459,49.997151&profile=vm-forum-velomobil-touristisch
-
+#
+# credits to @joerg_md in velomobilforum.de: fords (ford=yes) are penalized.
+#  - Way with ford=yes: extra cost ford_penalty per meter (applies to all three cost factors)
+#  - Node with ford=yes: one-time cost ford_node_cost (meters)
+# Fords remain passable as a last resort.
 
 
 ---context:global
-
 assign processUnusedTags  = true  # %add debug output% | 
 assign no_steps           = true  # %no_steps% | keine Stufen, das Velomobil soll nicht getragen werden müssen | boolean
 assign no_wrong_oneway    = false # %no_wrong oneway% | keine Einbahnstrasse in falsche Richtung, auch nicht schiebend | boolean
-
+ 
 assign dismount_cost      = 1000  # %dismount_cost% | Umweg in Meter der in Kauf genommen wird bevor eine Strecke genommen wird bei der man austeigen muss, ab 1 000 000 wird keine Schiebestrecke mehr genommen | number
 assign avoid_main_roads   = 3     # %avoid_main_roads% | große Straße vermeiden(0-10): 0 = nicht vermeiden, 1 = leicht vermeiden, 3 = Standard, 10 = stark vermeiden | number
 assign avoid_small_roads  = 2     # %avoid_small_roads% | kleine Straße vermeiden(0-10): 0 = nicht vermeiden, 1 = leicht vermeiden, 5 = Standard, 10 = stark vermeiden | number
@@ -23,53 +26,55 @@ assign avoid_cycleways    = 5     # %avoid_cycleways% | Radwege vermeiden(0-10):
 assign avoid_elevation    = 7     # %avoid_elevation% | Hohenmeter vermeiden(0-10): 0 = nicht vermeiden, 1 = leicht vermeiden, 5 = Standard, 10 = stark vermeiden | number
 assign avoid_bad_ways     = 5     # %avoid_bad_ways% | Schlechte Wege vermeiden(0-10): 0 = nicht vermeiden, 1 = leicht vermeiden, 8 = Standard, 10 = stark vermeiden | number
 
+assign ford_penalty       = 20    # %ford_penalty% | Furten (ford=yes) auf Wegen: Zusatzkosten pro Meter. 0 = egal, 20 = stark meiden, 100+ = nur im Notfall | number
+assign ford_node_cost     = 3000  # %ford_node_cost% | Furten (ford=yes) als Punkt: einmalige Zusatzkosten in Meter | number
+
 assign totalMass          = 110   # %totalMass% | Gesamtmasse des Fahrzeugs (Fahrzeug, Fahrer, Gepäck...) in kg, für Fahrtzeitschätzung | number
 assign maxSpeed           = 60    # %maxSpeed% | Maximale Geschwindigkeit ab der der Fahrer bremst in km/h
-assign S_C_x              = 0.05  # Effektive Stirnfläche in m²
-assign C_r                = 0.005 # Rollwiderstand
+assign S_C_x              = 0.05  # effective frontal area in m²
+assign C_r                = 0.005 # rolling resistance
 assign bikerPower         = 125   # %bikerPower% | Dauerleistung in Watt, für Fahrtzeitschätzung | number
 
 assign ignore_bicycle_no  = false # %ignore_bicycle_no% | für Regionen mit falschen bicyle=no tags können sie mit "true" ignoriert werden. Auch Shuttletransporte (bicycle=dismount + foot=no) werden geroutet | boolean
 
 assign turnInstructionMode          = 1    # %turnInstructionMode% | Modus für die Abbiegehinweise | [0=keine, 1=automatische Wahl, 2=locus-Style, 3=osmand-Style, 4=comment-Style, 5=gpsies-Style, 6=orux-Style]
-assign turnInstructionCatchingRange = 20   # innerhalb dieser Strecke werden mehrere Abiegehinweise zu einem zusammengefasst und die Abiegewinkel werden besser an die generelle Richtung angenähert
-assign turnInstructionRoundabouts   = true # mit "false" werden keine speziellen Abiegehinweise für den Kreisverkehr generiert 
+assign turnInstructionCatchingRange = 20   # within this distance several turn instructions are merged into one and the turn angles are better approximated to the general direction
+assign turnInstructionRoundabouts   = true # with "false" no special turn instructions are generated for roundabouts
 
 assign avoidmr2           = ( multiply 0.11111111 ( multiply avoid_main_roads avoid_main_roads ) )
 assign avoidsr            = ( multiply 0.2 avoid_small_roads )
 assign avoidbw            = ( multiply 0.125 avoid_bad_ways )
 assign avoid_ele          = ( multiply 0.2 avoid_elevation )
 
-assign downhillcost       = ( multiply avoid_ele 80 )  # Kosten für die Höhenmeter bergab
-assign downhillcutoff     = 5                          # Gefälle unter diesem Wert in Prozent werden nicht gewertet
-assign uphillcost         = ( multiply avoid_ele 120 ) # Kosten für die Höhenmeter bergauf
-assign uphillcutoff       = 0.5                        # Steigungen unter diesem Wert in Prozent werden nicht gewertet
+assign downhillcost       = ( multiply avoid_ele 80 )  # cost for downhill elevation
+assign downhillcutoff     = 5                          # gradients below this value (in percent) are not counted
+assign uphillcost         = ( multiply avoid_ele 120 ) # cost for uphill elevation
+assign uphillcutoff       = 0.5                        # gradients below this value (in percent) are not counted
+    
+assign validForBikes      = true                       # if true, the exceptions of turn restrictions for bicycles are enabled
+assign considerTurnRestrictions = true                 # if false, turn restrictions are ignored
 
-assign validForBikes      = true                       # bei true werden die Ausnahmen bei den Abbiegebeschränkungen für Fahrräder aktiviert
-assign considerTurnRestrictions = true                 # bei false werden die Abbiegebeschränkungen ignoriert
+assign pass1coefficient   = 3                          # calculation coefficient for the first, fast pass
+assign pass2coefficient   = 0                          # calculation coefficient for the second, exact pass
+# sensible values for the first coefficient:
+# 1 exact calculation in the first pass
+# the larger the value, the faster and less exact the first pass
+# sensible values for the second coefficient:
+# 0 exact calculation, limiting the search area by the costs of the first pass
+# -1 no second pass, only sensible with 1 in the first pass
 
-assign pass1coefficient   = 3                          # Berechnugskoeffizient für erste schnelle Berechnung
-assign pass2coefficient   = 0                          # Berechnugskoeffizient für zweite exakte Berechnung
-# sinnvolle Werte für den ersten Koeffizienten:
-# 1 exakte Berechnung beim ersten Durchlauf
-# umso größer die Werte umso schneller und ungenauer die erste Berechnung
-# sinnvolle Werte für den zweiten Koeffizienten:
-# 0 exakte Berechnung mit Beschränkung des Suchgebiets über die Kosten der ersten Berechnung
-# -1 keine zweite Berechnung, nur sinnvoll bei 1 im ersten Durchlauf
+# To filter the inaccurate SRTM elevation data, buffers are used for ascents and descents separately. Only when they are exceeded, the segments are counted as ascents or descents.
 
-# Um die ungenauen SRTM Höhendaten zu filtern werden für jeweils für Anstiege und Gefälle Puffer verwendet. Erst wenn diese überschritten werden die Segmente als Anstiege oder Gefälle gewertet.
-
-assign elevationpenaltybuffer =  5 # Höhenpuffer (in Meter) ab dem die Höhenstrafen beginnen und das Segment als Anstieg und Gefälle gewertet wird
-assign elevationmaxbuffer     = 10 # Maximale Puffergröße (in Meter), alles darüberhinausgehende wird voll bestraft
-assign elevationbufferreduce  =  1 # im Bereich zwischen elevationpenaltybuffer und elevationmaxbuffer wird eine Höhenstrafe, die einer Steigung oder Gefälle dieses Wertes (in Prozent) entspricht, verhängt und diese Höhenmeter vom Puffer abgezogen.
-
+assign elevationpenaltybuffer =  5 # elevation buffer (in meters) above which the elevation penalties begin and the segment is counted as ascent or descent
+assign elevationmaxbuffer     = 10 # maximum buffer size (in meters), everything beyond is fully penalized
+assign elevationbufferreduce  =  1 # in the range between elevationpenaltybuffer and elevationmaxbuffer, an elevation penalty corresponding to a gradient of this value (in percent) is applied and these meters of elevation are subtracted from the buffer.
 
 ---context:way
 
-# Parameter für die Wege
-# zusätzliche Kosten in Meter für jeden Streckenabschnitt
+# parameters for the ways
+# additional cost in meters for each road section
 
-assign long_cycleroute = ( or route_bicycle_icn=yes ( or route_bicycle_ncn=yes route_bicycle_rcn=yes ) )
+assign long_cycleroute   = ( or route_bicycle_icn=yes ( or route_bicycle_ncn=yes route_bicycle_rcn=yes ) )
 assign nodeaccessgranted = ( or long_cycleroute rcn=yes )
 
 #assign long_cycleroute = ( and long_cycleroute ( and route=bicycle ( or network=rcn ( or network=ncn network=icn ) ) ) )
@@ -78,9 +83,9 @@ assign cycleway = ( or highway=cycleway ( and highway=path|footway|pedestrian bi
 
 assign footway  = ( or highway=footway|pedestrian ( and highway=path foot=designated|yes ) )
 
-assign turncost = ( switch junction=roundabout 40  225 ) # Kosten die für eine 90 Grad Abbiegung berechnet werden. Für kleinere Winkel werden sie mit turncost*cos(Winkel) berechnet, bei Kreisverkehr keine weitere Kosten
+assign turncost = ( switch junction=roundabout 40  225 ) # cost charged for a 90 degree turn. For smaller angles it is calculated as turncost*cos(angle), no further cost for roundabouts
 
-assign initialclassifier = ( # hier wird bestimmten Wegen ein Wert zugeordnet und wenn er sich vom vorherigen unterscheidet die initalcost hinzugerechnet
+assign initialclassifier = ( # here certain ways are assigned a value, and if it differs from the previous one, the initialcost is added
     switch route=ferry   2
     switch highway=steps 3
     switch cycleway      4
@@ -89,107 +94,122 @@ assign initialclassifier = ( # hier wird bestimmten Wegen ein Wert zugeordnet un
 )
 
 assign initialcost = (
-    switch route=ferry     5000                                      # Kosten wenn eine Fähre verwendet wird
-    switch highway=steps   ( switch no_steps 1000000 dismount_cost ) # Kosten für Stufen
-    switch long_cycleroute 0                                         # lange Radrouten gerne
-    switch cycleway        ( multiply 10 ( multiply avoid_cycleways avoid_cycleways ) ) # Kosten für Radwege
-    switch footway         dismount_cost                             # Kosten für Fußwege
+    switch route=ferry     5000                                      # cost when a ferry is used
+    switch highway=steps   ( switch no_steps 1000000 dismount_cost ) # cost for steps
+    switch long_cycleroute 0                                         # long cycle routes are welcome
+    switch 
+        cycleway        
+        ( multiply  
+            10 
+            ( multiply 
+                avoid_cycleways 
+                avoid_cycleways 
+            ) 
+        ) # cost for cycleways
+    switch footway         dismount_cost                             # cost for footways
                            0                                         # default
 )
 
-# Kosten ab hier als Meter für jeden tatsächlichen Meter
+# costs from here on are in meters for each actual meter
 
-assign oneway = (
-    switch
-        oneway=
-        junction=roundabout
+assign oneway = 
+    ( switch 
+        oneway= 
+        junction=roundabout 
         oneway=1|true|yes
-)
+    )
 
-assign onewaypenalty = (
-    switch
-        ( switch reversedirection=yes oneway oneway=-1 )
-        ( switch
-            ( or
-                cycleway=opposite|opposite_lane|opposite_track
-                oneway:bicycle=no
+assign onewaypenalty = 
+    ( switch  
+        ( switch reversedirection=yes oneway  oneway=-1 )
+        ( switch 
+            ( or 
+                cycleway=opposite|opposite_lane|opposite_track 
+                oneway:bicycle=no 
             )
-            0.5 #zusätzliche Kosten für in Gegenrichtung für Radfahrer freigegebene Einbahnstraßen in Gegenrichtung
-            ( switch
-                no_wrong_oneway                                        10000
-                switch ( or highway=primary highway=primary_link )     40 # zusätzliche Kosten für Bundesstraßen Einbahnstraßen in Gegenrichtung
-                switch ( or highway=secondary highway=secondary_link ) 25 # zusätzliche Kosten für Landstraßen Einbahnstraßen in Gegenrichtung
-                switch ( or highway=tertiary highway=tertiary_link )   15 # zusätzliche Kosten für Kreisstraßen Einbahnstraßen in Gegenrichtung
-                                                                       15 # zusätzliche Kosten für sonstige Einbahnstraßen in Gegenrichtung
+            0.5 # additional cost for one-way streets opened for cyclists in the opposite direction, when going in the opposite direction
+            ( switch 
+                no_wrong_oneway                                     10000
+                switch ( or highway=primary highway=primary_link )     40 # additional cost for federal roads, one-way streets in the wrong direction
+                switch ( or highway=secondary highway=secondary_link ) 25 # additional cost for state roads, one-way streets in the wrong direction
+                switch ( or highway=tertiary highway=tertiary_link )   15 # additional cost for district roads, one-way streets in the wrong direction
+                                                                       15 # additional cost for other one-way streets in the wrong direction
             )
         )
-        0.0
-)
+        0.0    
+    )
 
-assign defaultaccess = (
-    switch
-        access=
+assign defaultaccess = 
+    ( switch 
+        access= 
         ( not motorroad=yes )
-        ( switch
-            ( or access=private access=no )
+        ( switch 
+            ( or access=private access=no ) 
             0
             1
         )
-)
+    )
 
-assign bikeaccess = (
-    or
-        long_cycleroute
-        ( switch
+assign bikeaccess = 
+    ( or  
+        long_cycleroute 
+        ( switch 
             bicycle=
-            ( switch
+            ( switch  
                 vehicle=
                 defaultaccess
-                ( switch
+                ( switch 
                     ( or vehicle=private vehicle=no )
                     0
                     1
                 )
             )
-            ( not
-                ( or
-                    bicycle=private
-                    ( or
-                        ( and
-                            not ignore_bicycle_no
-                            bicycle=no
-                        )
+            ( not  
+                ( or 
+                    bicycle=private 
+                    ( or 
+                        ( and 
+                            not ignore_bicycle_no 
+                            bicycle=no 
+                        ) 
                         bicycle=dismount
                     )
                 )
             )
         )
-)
+    )
 
 
-assign footaccess = (
-    or
+assign footaccess = 
+    ( or 
         bikeaccess
         ( or
-            ( and bicycle=dismount ignore_bicycle_no )
-            ( switch
+            ( and  bicycle=dismount ignore_bicycle_no )
+            ( switch 
                 foot=
                 defaultaccess
                 not ( or foot=private foot=no )
             )
         )
-)
+    )
 
-assign accesspenalty = (
-    switch
-        bikeaccess
-        0
-        ( switch
-            footaccess
-               15 #Zusatzkosten fürs Schieben
-            10000 #Zusatzkosten für gesperrte oder private Wege
+# Ford penalty per meter (ford tagged on the way)
+assign fordpenalty = ( switch ford=yes ford_penalty 0 )
+
+# fordpenalty is added to accesspenalty so it applies to flat, downhill and uphill cost factors
+assign accesspenalty = 
+    ( add
+        fordpenalty
+        ( switch  
+            bikeaccess
+            0
+            ( switch 
+                footaccess
+                   15 # additional cost for pushing
+                10000 # additional cost for closed or private ways
+            )
         )
-)
+    )
 
 
 assign maxspeed_forward = (
@@ -231,10 +251,18 @@ assign maxspeed_backward = (
 )
 
 assign maxspeed = (
-    switch ( and reversedirection=yes maxspeed_backward )
-        maxspeed_backward
-    switch ( and ( not reversedirection=yes ) maxspeed_forward )
-        maxspeed_forward
+    switch  
+        ( and 
+            reversedirection=yes 
+            maxspeed_backward 
+        )        
+        maxspeed_backward 
+    switch 
+        ( and 
+            ( not reversedirection=yes ) 
+            maxspeed_forward 
+        ) 
+        maxspeed_forward 
     switch maxspeed=50     50
     switch maxspeed=30     30
     switch maxspeed=10     10
@@ -254,195 +282,192 @@ assign maxspeed = (
 )
 
 assign downspeedpenalty = (
-    switch equal maxspeed 10 5   # Zusatzkosten für Geschwindigkeitsbegrenzung 10 km/h bei Gefälle
-    switch equal maxspeed 20 2   # Zusatzkosten für Geschwindigkeitsbegrenzung 20 km/h bei Gefälle
-    switch equal maxspeed 30 1   # Zusatzkosten für Geschwindigkeitsbegrenzung 30 km/h bei Gefälle
-    switch equal maxspeed 40 0.8 # Zusatzkosten für Geschwindigkeitsbegrenzung 40 km/h bei Gefälle
-    switch equal maxspeed 50 0.5 # Zusatzkosten für Geschwindigkeitsbegrenzung 50 km/h bei Gefälle
+    switch equal maxspeed 10 5   # additional cost for speed limit 10 km/h downhill
+    switch equal maxspeed 20 2   # additional cost for speed limit 20 km/h downhill
+    switch equal maxspeed 30 1   # additional cost for speed limit 30 km/h downhill
+    switch equal maxspeed 40 0.8 # additional cost for speed limit 40 km/h downhill
+    switch equal maxspeed 50 0.5 # additional cost for speed limit 50 km/h downhill
                              0   # default
 )
 
 assign flatspeedpenalty = (
-    switch equal maxspeed  10 3   # Zusatzkosten für Geschwindigkeitsbegrenzung 10 km/h in der Ebene
-    switch equal maxspeed  20 1   # Zusatzkosten für Geschwindigkeitsbegrenzung 20 km/h in der Ebene
-    switch equal maxspeed  30 0.5 # Zusatzkosten für Geschwindigkeitsbegrenzung 30 km/h in der Ebene
-    switch equal maxspeed  40 0.3 # Zusatzkosten für Geschwindigkeitsbegrenzung 40 km/h in der Ebene
-    switch equal maxspeed  70 0.1 # Zusatzkosten für Geschwindigkeitsbegrenzung 70 km/h in der Ebene
-    switch equal maxspeed  80 0.2 # Zusatzkosten für Geschwindigkeitsbegrenzung 80 km/h in der Ebene
-    switch equal maxspeed  90 0.3 # Zusatzkosten für Geschwindigkeitsbegrenzung 90 km/h in der Ebene
-    switch equal maxspeed 100 0.4 # Zusatzkosten für Geschwindigkeitsbegrenzung 100 km/h in der Ebene
+    switch equal maxspeed  10 3   # additional cost for speed limit 10 km/h on flat terrain
+    switch equal maxspeed  20 1   # additional cost for speed limit 20 km/h on flat terrain
+    switch equal maxspeed  30 0.5 # additional cost for speed limit 30 km/h on flat terrain
+    switch equal maxspeed  40 0.3 # additional cost for speed limit 40 km/h on flat terrain
+    switch equal maxspeed  70 0.1 # additional cost for speed limit 70 km/h on flat terrain
+    switch equal maxspeed  80 0.2 # additional cost for speed limit 80 km/h on flat terrain
+    switch equal maxspeed  90 0.3 # additional cost for speed limit 90 km/h on flat terrain
+    switch equal maxspeed 100 0.4 # additional cost for speed limit 100 km/h on flat terrain
                               0   # default
 )
 
 assign upspeedpenalty = (
-    switch equal maxspeed 10 1.5 # Zusatzkosten für Geschwindigkeitsbegrenzung 10 km/h bei Anstiegen
-    switch equal maxspeed 20 0.4 # Zusatzkosten für Geschwindigkeitsbegrenzung 20 km/h bei Anstiegen
-    switch equal maxspeed 30 0.1 # Zusatzkosten für Geschwindigkeitsbegrenzung 30 km/h bei Anstiegen
+    switch equal maxspeed 10 1.5 # additional cost for speed limit 10 km/h uphill
+    switch equal maxspeed 20 0.4 # additional cost for speed limit 20 km/h uphill
+    switch equal maxspeed 30 0.1 # additional cost for speed limit 30 km/h uphill
                              0   # default
 )
 
-assign surfacepenalty = (
-    add
-        ( switch
-            embedded_rails=tram|yes|rail
-            10 # Zusatzkosten bei Schienen in der Fahrbahn
+assign surfacepenalty = 
+    ( add  
+        ( switch 
+            embedded_rails=tram|yes|rail 
+            10 # additional cost for rails in the roadway
              0 # default
         )
-        ( multiply
+        ( multiply 
             avoidbw
             (
-                switch surface=asphalt|concrete|paved                    0   #Zusatzkosten für Teer, Beton oder versiegelte Flächen
-                switch concrete=plates                                   0.5 # Zusatzkosten für Betonplattenwege
-                switch concrete=lanes                                    5   # Zusatzkosten für Betonspurplatten
-                switch surface=paving_stones|wood|metal                  0.5 #Zusatzkosten für Pflastersteine, Holz oder Metall
-                switch surface=grass_paver                               5   #Zusatzkosten für  Rasengittersteine
-                switch surface=cobblestone|fine_gravel|compacted|sett    1.5 #Zusatzkosten für Kopfsteinpflaster, Splitt, verdichtete Deckschicht, behauene Pflastersteine
-                switch surface=gravel|sand|pebblestone                  10   #Zusatzkosten für Schotter, Sand oder Kies
-                switch surface=ground|grass|unpaved|dirt|earth|mud|clay 50   #Zusatzkosten für naturbelassene Wege, Grasswege, unbefestigte Wege, Schmutzwege, erdige Wege, schlammige Wege oder Lehmwege
+                switch surface=asphalt|concrete|paved                    0   # additional cost for asphalt, concrete or sealed surfaces
+                switch concrete=plates                                   0.5 # additional cost for concrete slab ways
+                switch concrete=lanes                                    5   # additional cost for concrete lanes
+                switch surface=paving_stones|wood|metal                  0.5 # additional cost for paving stones, wood or metal
+                switch surface=grass_paver                               5   # additional cost for grass pavers
+                switch surface=cobblestone|fine_gravel|compacted|sett    1.5 # additional cost for cobblestone, fine gravel, compacted surface, sett
+                switch surface=gravel|sand|pebblestone                  10   # additional cost for gravel, sand or pebbles
+                switch surface=ground|grass|unpaved|dirt|earth|mud|clay 50   # additional cost for natural ways, grass ways, unpaved ways, dirt ways, earth ways, muddy ways or clay ways
                                                                          0   # default
             )
         )
-)
+    )
 
 
-assign smoothnesspenalty = (
-    multiply
+assign smoothnesspenalty = 
+    ( multiply 
         avoidbw
         (
-            switch smoothness=excellent                                                                   0   # Zusatzkosten für excellente Oberflächen
-            switch smoothness=very_good                                                                   0.4 # Zusatzkosten für sehr gute Oberflächen, z.B. Splitt auf Asphalt, der auf Rollerblades und in einem ungefederten Velomobil weniger angenehm zu fahren ist.
-            switch smoothness=good                                                                        0.5 # Zusatzkosten für gute Oberflächen
+            switch smoothness=excellent                                                                   0   # additional cost for excellent surfaces
+            switch smoothness=very_good                                                                   0.4 # additional cost for very good surfaces, e.g. fine gravel on asphalt, which is less pleasant to ride on rollerblades and in an unsprung velomobile
+            switch smoothness=good                                                                        0.5 # additional cost for good surfaces
                                                                                                               # 0.6 is too much for avoiding Eindhoven where destination is Veldhoven-dorp and origin is northeast
-            switch smoothness=intermediate|medium                                                         1   # Zusatzkosten für mittelmäßige Oberflächen
-            switch smoothness=rough|poor                                                                  2   # Zusatzkosten für raue oder schlechte Oberflächen
-            switch smoothness=robust_wheels|bad                                                          10   # Zusatzkosten für Oberflächen die robuste Reifen benötigen oder schlechte Oberflächen
-            switch smoothness=high_clearance|off_road_wheels|very_bad|horrible|very_horrible|impassable 100   # Zusatzkosten für Oberflächen die eine erhöhte Bodenfreiheit oder Geländebereifung benötigen, schrecklich, sehr schrecklich oder unpasierbar sind
-                                                                                                          0.5 # =good als Standardwert
+            switch smoothness=intermediate|medium                                                         1   # additional cost for intermediate surfaces
+            switch smoothness=rough|poor                                                                  2   # additional cost for rough or poor surfaces
+            switch smoothness=robust_wheels|bad                                                          10   # additional cost for surfaces that need robust tires, or bad surfaces
+            switch smoothness=high_clearance|off_road_wheels|very_bad|horrible|very_horrible|impassable 100   # additional cost for surfaces that need high ground clearance or off-road tires, or that are horrible, very horrible or impassable
+                                                                                                          0.5 # = good as default value
         )
-)
+    )
 
 
-# dieser Abschnitt ist für die Kosten in der Ebene
-assign costfactor = (
-    switch ( and highway= not route=ferry ) 10000 # Kosten für alles ohne highway tag außer Fähren
-    switch highway=|abandoned               10000 # Kosten für geplante oder aufgegebene Wege
-    ( min
-        9999
-        ( max
-            1
-            ( add
-                onewaypenalty
-                ( add
-                    accesspenalty
-                    ( add
-                        ( max surfacepenalty smoothnesspenalty )
-                        ( add
-                            flatspeedpenalty
-                            ( max
-                                1
-                                (
-                                    switch highway=motorway|motorway_link 10000    # Kosten für Autobahnen
-                                    switch route=ferry                    10.67    # Kosten für Fähren
-                                    switch long_cycleroute                1
-                                    switch railway=abandoned              1
-                                    # switch railtrail=yes                1
-                                    switch highway=trunk|trunk_link
-                                        ( add
-                                            1
-                                            ( multiply avoidmr2 1.5 )
-                                        ) # Kosten für eine autobahnänliche Straße
-                                    switch highway=primary|primary_link
-                                        ( add
-                                            0.5
-                                            ( multiply avoidmr2 0.7 )
-                                        ) # Kosten für Bundesstraßen
-                                    switch highway=secondary|secondary_link 1      # Kosten für Landstraßen
-                                    switch long_cycleroute
-                                        ( add
-                                            1
-                                            ( multiply avoidmr2 0.7 )
-                                        ) # Kosten für Radfernrouten
-                                    switch highway=tertiary|tertiary_link
-                                        ( add
-                                            0.5
-                                            ( multiply avoidsr 0.6 )
-                                        ) # Kosten für Kreisstraßen
-                                    switch highway=unclassified
-                                        ( add
-                                            0.5
-                                            ( multiply avoidsr 0.7 )
-                                        ) # Kosten für Verbindungsstraßen
-                                    switch highway=residential|service
-                                        ( add
-                                            0.7
-                                            ( multiply avoidsr 1 )
-                                        ) # Kosten für Wohn- und Zufahrtsstraßen
-                                    switch highway=track
-                                        ( switch tracktype=grade1
-                                            ( add
-                                                0.7
-                                                ( multiply avoidsr 1.5 )
-                                            ) # Kosten für geteerte, betonierte oder gepflasterte Feldwege
-                                            switch tracktype=grade2
-                                            ( multiply
-                                                avoidbw
-                                                ( add
-                                                    3
-                                                    ( multiply avoidsr 10 )
-                                                )
-                                            ) # Kosten für geschotterte Feldwege
-                                            switch tracktype=grade3
-                                            ( multiply
-                                                avoidbw
-                                                40
-                                            ) # Kosten für Feldwege mit weichem Untergrund
-                                            switch tracktype=grade4
-                                            ( multiply
-                                                avoidbw
-                                                50
-                                            ) # Kosten für unbefestigte Feldwege
-                                            switch tracktype=grade5
-                                            ( multiply
-                                                avoidbw
-                                                50
-                                            ) # Kosten für kaum erkennbare Feldwege
-                                            switch surface=
-                                            ( multiply
-                                                avoidbw
-                                                20
-                                            ) # Kosten für Feldwege ohne Oberflächenangabe
-                                            ( add
-                                                1
-                                                ( multiply avoidsr 1 )
-                                            ) # Kosten für Feldwege mit Oberflächenangabe
-                                        )
-                                    switch cycleway
-                                        ( add
-                                            0.4
-                                            ( multiply avoid_cycleways 0.24 )
-                                        ) # Kosten für Fahrradwege
-                                    switch highway=living_street
-                                        ( add
-                                            1.5
-                                            ( multiply avoidsr 3 )
-                                        ) # Kosten für Spielstraßen
-                                    switch highway=road
-                                        ( add
-                                            4
-                                            ( multiply avoidsr 6 )
-                                        ) # Kosten für noch nicht genauer beschriebene Straße
-                                    switch footway                        20       # Kosten für Fußwege
-                                    switch highway=steps                  40       # Kosten für Stufen
-                                    switch highway=path
-                                        switch surface=
-                                            ( multiply avoidbw 40 ) # Kosten für Pfade ohne Oberflächenangabe
-                                            ( add
-                                                1
-                                                ( multiply avoidsr 1.5 ) # Kosten für Pfade mit Oberflächenangabe
-                                            )
-                                    switch highway=bridleway
-                                        ( multiply avoidbw 80 ) # Kosten für Reitwege
-                                    20 # Kosten für sonstige Wege
+# this section is for the costs on flat terrain
+assign costfactor = 
+    ( 
+        switch ( and highway= not route=ferry )           10000 # cost for everything without highway tag except ferries
+        switch highway=|abandoned                         10000 # cost for planned or abandoned ways
+        ( min 
+            9999
+            ( max 
+                1
+                ( add 
+                    onewaypenalty
+                    ( add 
+                        accesspenalty
+                        ( add 
+                            ( max surfacepenalty smoothnesspenalty )
+                            ( add 
+                                flatspeedpenalty
+                                ( max 
+                                    1
+                                    (
+                                        switch highway=motorway|motorway_link 10000     # cost for motorways
+                                        switch route=ferry                       10.67  # cost for ferries
+                                        switch long_cycleroute                    1
+                                        switch railway=abandoned                  1
+                                        # switch railtrail=yes                    1
+                                        switch highway=trunk|trunk_link         ( add 
+                                                                                    1 
+                                                                                    ( multiply  avoidmr2 1.5  ) 
+                                                                                )       # cost for motorway-like roads
+                                        switch highway=primary|primary_link     ( add 
+                                                                                    0.5 
+                                                                                    ( multiply avoidmr2 0.7 ) 
+                                                                                )       # cost for federal roads
+                                        switch highway=secondary|secondary_link   1     # cost for state roads
+                                        switch long_cycleroute                  ( add 
+                                                                                    1 
+                                                                                    ( multiply avoidmr2 0.7 )
+                                                                                )       # cost for long-distance cycle routes
+                                        switch highway=tertiary|tertiary_link   ( add 
+                                                                                    0.5 
+                                                                                    ( multiply avoidsr 0.6 )
+                                                                                )       # cost for district roads
+                                        switch highway=unclassified             ( add 
+                                                                                    0.5 
+                                                                                    ( multiply avoidsr 0.7 )
+                                                                                )       # cost for connecting roads
+                                        switch highway=residential|service      ( add
+                                                                                    0.7 
+                                                                                    ( multiply avoidsr 1 )
+                                                                                )       # cost for residential and access roads
+                                        switch highway=track                    ( switch tracktype=grade1 
+                                                                                    ( add
+                                                                                        0.7 
+                                                                                        ( multiply avoidsr 1.5 )
+                                                                                    )   # cost for asphalt, concrete or paved farm tracks
+                                                                                switch tracktype=grade2 
+                                                                                    ( multiply 
+                                                                                        avoidbw 
+                                                                                        ( add 
+                                                                                            3 
+                                                                                            ( multiply
+                                                                                                avoidsr 
+                                                                                                10
+                                                                                            )
+                                                                                        )
+                                                                                    ) # cost for gravel farm tracks
+                                                                                switch tracktype=grade3                 
+                                                                                    ( multiply 
+                                                                                        avoidbw 
+                                                                                        40 
+                                                                                    )       # cost for farm tracks with soft ground
+                                                                                switch tracktype=grade4                
+                                                                                    ( multiply 
+                                                                                        avoidbw 
+                                                                                        50 
+                                                                                    )       # cost for unpaved farm tracks
+                                                                                switch tracktype=grade5                 
+                                                                                    ( multiply  
+                                                                                        avoidbw 
+                                                                                        50 
+                                                                                    )       # cost for barely recognizable farm tracks
+                                                                                switch surface=                         
+                                                                                    ( multiply 
+                                                                                        avoidbw 
+                                                                                        20 
+                                                                                    )       # cost for farm tracks without surface information
+                                                                                    ( add 
+                                                                                        1 
+                                                                                        ( multiply
+                                                                                            avoidsr 
+                                                                                            1
+                                                                                        )
+                                                                                    )       # cost for farm tracks with surface information
+                                                                                )
+                                        switch cycleway                         ( add 
+                                                                                    0.4 
+                                                                                    ( multiply avoid_cycleways 0.24 )
+                                                                                )                   # cost for cycleways
+                                        switch highway=living_street            ( add 
+                                                                                    1.5 
+                                                                                    ( multiply avoidsr 3 ) 
+                                                                                )                   # cost for living streets
+                                        switch highway=road                     ( add 
+                                                                                    4 
+                                                                                    ( multiply avoidsr 6 ) 
+                                                                                )                   # cost for roads not yet described in more detail
+                                        switch footway                           20                  # cost for footways
+                                        switch highway=steps                     40                  # cost for steps
+                                        switch highway=path                     switch 
+                                                                                    surface= 
+                                                                                    ( multiply avoidbw 40 ) # cost for paths without surface information
+                                                                                    ( add 
+                                                                                        1 
+                                                                                        ( multiply avoidsr 1.5 ) # cost for paths with surface information
+                                                                                    )
+                                        switch highway=bridleway                ( multiply avoidbw 80 ) # cost for bridleways
+                                                                                20                  # cost for other ways
+                                    )
                                 )
                             )
                         )
@@ -451,39 +476,38 @@ assign costfactor = (
             )
         )
     )
-)
-
-# dieser Abschnitt ist für die Kosten bei Gefälle
-# da er von der Struktur identisch wie der vorvorherige Abschnitt werde ich die Beschreibung hier auch nicht wiederholen
-assign downhillcostfactor =
-    switch ( and highway= not route=ferry )          10000
+ 
+# this section is for the costs on downhill sections
+# as its structure is identical to the section before the previous one, I will not repeat the description here
+assign downhillcostfactor = 
+    switch ( and  highway= not route=ferry ) 10000
     switch ( or highway=proposed highway=abandoned ) 10000
-    ( min
-        9999
-        ( max
+    ( min 
+        9999 
+        ( max 
             1
-            ( add
+            ( add 
                 downspeedpenalty
                 ( add
                     onewaypenalty
                     ( add
                         accesspenalty
-                        ( add
+                        ( add 
                             ( max smoothnesspenalty surfacepenalty )
-                            ( max
+                            ( max 
                                 1
                                 (
-                                    switch highway=motorway|motorway_link   10000
-                                    switch route=ferry                      10.67
-                                    switch railway=abandoned                1
-                                    switch long_cycleroute                  1
-                                    switch highway=trunk|trunk_link         ( add 0.5 ( multiply avoidmr2 1 ) )
-                                    switch highway=primary|primary_link     ( add 0.4 ( multiply avoidmr2 0.5 ) )
+                                    switch highway=motorway|motorway_link 10000
+                                    switch route=ferry 10.67
+                                    switch railway=abandoned 1
+                                    switch long_cycleroute 1
+                                    switch highway=trunk|trunk_link ( add 0.5 ( multiply avoidmr2 1 ) )
+                                    switch highway=primary|primary_link ( add 0.4 ( multiply avoidmr2 0.5 ) )
                                     switch highway=secondary|secondary_link 0.75
-                                    switch highway=tertiary|tertiary_link   ( add 0.5 ( multiply avoidsr 0.9 ) )
-                                    switch highway=unclassified             ( add 0.5 ( multiply avoidsr 1.1 ) )
-                                    switch highway=residential|service      ( add 1 ( multiply avoidsr 1.5 ) )
-                                    switch highway=track
+                                    switch highway=tertiary|tertiary_link ( add 0.5 ( multiply avoidsr 0.9 ) )
+                                    switch highway=unclassified ( add 0.5 ( multiply avoidsr 1.1 ) )
+                                    switch highway=residential|service ( add 1 ( multiply avoidsr 1.5 ) )
+                                    switch highway=track 
                                         (
                                             switch tracktype=grade1 ( add 1.3 ( multiply avoidsr 1.2 ) )
                                             switch tracktype=grade2 ( multiply avoidbw ( add 4 ( multiply avoidsr 6 ) ) )
@@ -491,20 +515,19 @@ assign downhillcostfactor =
                                             switch tracktype=grade4 ( multiply avoidbw 50 )
                                             switch tracktype=grade5 ( multiply avoidbw 50 )
                                             switch surface=         ( multiply avoidbw 20 )
-                                                                    ( add 1.5 ( multiply avoidsr 1.2 ) )
+                                            ( add 1.5 ( multiply avoidsr 1.2 ) )
                                         )
-                                    switch cycleway                         ( add 0.6 ( multiply avoid_cycleways 0.6 ) )
-                                    switch highway=living_street            ( add 1.5 ( multiply avoidsr 6 ) )
-                                    switch highway=road                     ( add 4   ( multiply avoidsr 6 ) )
-                                    switch footway                          40
-                                    switch highway=steps                    50
-                                    switch highway=path
-                                        (
-                                            switch surface= ( multiply avoidbw 40 )
-                                                            ( add 2 ( multiply avoidsr 2 ) )
-                                        )
-                                    switch highway=bridleway                ( multiply avoidbw 80 )
-                                                                            20
+                                    switch cycleway              ( add 0.6 ( multiply avoid_cycleways 0.6 ) )
+                                    switch highway=living_street ( add 1.5 ( multiply avoidsr 6 ) )
+                                    switch highway=road          ( add 4   ( multiply avoidsr 6 ) )
+                                    switch footway 40
+                                    switch highway=steps 50
+                                    switch highway=path (
+                                        switch surface= ( multiply avoidbw 40 )
+                                        ( add 2 ( multiply avoidsr 2 ) )
+                                    )
+                                    switch highway=bridleway ( multiply avoidbw 80 )
+                                    20
                                 )
                             )
                         )
@@ -515,12 +538,14 @@ assign downhillcostfactor =
     )
 
 
-# dieser Abschnitt ist für die Kosten bei Anstiegen
-# da er von der Struktur identisch wie der vorherige Abschnitt werde ich die Beschreibung hier nicht wiederholen
-assign uphillcostfactor =
-    switch ( and highway= not route=ferry )          10000
+ 
+
+# this section is for the costs on uphill sections
+# as its structure is identical to the previous section, I will not repeat the description here
+assign uphillcostfactor = 
+    switch ( and highway= not route=ferry ) 10000
     switch ( or highway=proposed highway=abandoned ) 10000
-    ( min
+    ( min 
         9999
         ( max
             1
@@ -528,24 +553,24 @@ assign uphillcostfactor =
                 onewaypenalty
                 ( add
                     accesspenalty
-                    ( add
+                    ( add 
                         ( max surfacepenalty smoothnesspenalty )
-                        ( add
+                        ( add 
                             upspeedpenalty
-                            ( max
+                            ( max 
                                 1
                                 (
-                                    switch highway=motorway|motorway_link   10000
-                                    switch route=ferry                      10.67
-                                    switch long_cycleroute                  1
-                                    switch railway=abandoned                1
-                                    switch highway=trunk|trunk_link         ( add 1   ( multiply avoidmr2 5.5 ) )
-                                    switch highway=primary|primary_link     ( add 0.5 ( multiply avoidmr2 2.5 ) )
+                                    switch highway=motorway|motorway_link 10000
+                                    switch route=ferry 10.67
+                                    switch long_cycleroute 1
+                                    switch railway=abandoned 1
+                                    switch highway=trunk|trunk_link ( add 1 ( multiply avoidmr2 5.5 ) )
+                                    switch highway=primary|primary_link ( add 0.5 ( multiply avoidmr2 2.5 ) )
                                     switch highway=secondary|secondary_link ( add 0.5 ( multiply avoidmr2 0.7 ) )
-                                    switch highway=tertiary|tertiary_link   1
-                                    switch highway=unclassified             1
-                                    switch highway=residential|service      ( add 0.5 ( multiply avoidsr 0.9 ) )
-                                    switch highway=track
+                                    switch highway=tertiary|tertiary_link 1
+                                    switch highway=unclassified 1
+                                    switch highway=residential|service ( add 0.5 ( multiply avoidsr 0.9 ) )
+                                    switch highway=track 
                                         (
                                             switch tracktype=grade1 ( add 0.8 ( multiply avoidsr 1.2 ) )
                                             switch tracktype=grade2 ( multiply avoidbw ( add 2 ( multiply avoidsr 6 ) ) )
@@ -553,20 +578,19 @@ assign uphillcostfactor =
                                             switch tracktype=grade4 ( multiply avoidbw 50 )
                                             switch tracktype=grade5 ( multiply avoidbw 50 )
                                             switch surface=         ( multiply avoidbw 20 )
-                                                                    ( add 1 ( multiply avoidsr 1.5 ) )
+                                            ( add 1 ( multiply avoidsr 1.5 ) )
                                         )
-                                    switch cycleway                         ( add 0.2 ( multiply avoid_cycleways 0.2 ) )
-                                    switch highway=living_street            ( add 1   ( multiply avoidsr 2 ) )
-                                    switch highway=road                     ( add 4   ( multiply avoidsr 6 ) )
-                                    switch footway                          15
-                                    switch highway=steps                    40
-                                    switch highway=path
-                                        (
-                                            switch surface= ( multiply avoidbw 40 )
-                                                            ( add 1 ( multiply avoidsr 1.5 ) )
-                                        )
-                                    switch highway=bridleway                ( multiply avoidbw 80 )
-                                                                            20
+                                    switch cycleway ( add 0.2 ( multiply avoid_cycleways 0.2 ) )
+                                    switch highway=living_street ( add 1 ( multiply avoidsr 2 ) )
+                                    switch highway=road ( add 4 ( multiply avoidsr 6 ) )
+                                    switch footway 15
+                                    switch highway=steps 40
+                                    switch highway=path (
+                                        switch surface= ( multiply avoidbw 40 )
+                                        ( add 1 ( multiply avoidsr 1.5 ) )
+                                    )
+                                    switch highway=bridleway ( multiply avoidbw 80 )
+                                    20
                                 )
                             )
                         )
@@ -576,10 +600,10 @@ assign uphillcostfactor =
         )
     )
 
-# hier kommen Variablen die zur Generierung der Abbiegehinweise benötigt werden
+# here come the variables needed to generate the turn instructions
 
 assign priorityclassifier =
-    if      ( highway=motorway                    ) then 30
+    if   ( highway=motorway         ) then 30
     else if ( highway=motorway_link               ) then 29
     else if ( highway=trunk                       ) then 28
     else if ( highway=trunk_link                  ) then 27
@@ -594,10 +618,10 @@ assign priorityclassifier =
     else if ( highway=service                     ) then 6
     else if ( highway=cycleway                    ) then 6
     else if ( bicycle=designated                  ) then 6
-    else if ( highway=track                       ) then
-        ( if
-            tracktype=grade1
-            then 6
+    else if ( highway=track                       ) then 
+        ( if 
+            tracktype=grade1 
+            then 6 
             else 4
         )
     else if ( highway=bridleway|road|path|footway ) then 4
@@ -606,14 +630,13 @@ assign priorityclassifier =
     else 0
 
 
-assign isbadoneway  = not equal onewaypenalty 0
+assign isbadoneway = not equal onewaypenalty 0
 assign isgoodoneway = (
     if reversedirection=yes then oneway=-1
-    else if oneway= then junction=roundabout
-    else oneway=yes|true|1
+    else if oneway= then junction=roundabout else oneway=yes|true|1
 )
 assign isroundabout = junction=roundabout
-assign islinktype   = highway=motorway_link|trunk_link|primary_link|secondary_link|tertiary_link
+assign islinktype = highway=motorway_link|trunk_link|primary_link|secondary_link|tertiary_link
 assign isgoodforcars = (
     if greater priorityclassifier 6 then true
     else if highway=residential|living_street|service then true
@@ -621,43 +644,42 @@ assign isgoodforcars = (
     else false
 )
 
-assign classifiermask = (
-    add
-        isbadoneway
-        ( add
-            ( multiply isgoodoneway 2 )
-            ( add
-                ( multiply isroundabout 4 )
-                ( add
-                    ( multiply islinktype 8 )
-                    ( multiply isgoodforcars 16 )
-                )
+assign classifiermask = ( add 
+    isbadoneway
+    ( add 
+        ( multiply isgoodoneway 2 )
+        ( add 
+            ( multiply isroundabout 4 )
+            ( add  
+                ( multiply islinktype 8 )
+                ( multiply isgoodforcars 16 )
             )
         )
+    )
 )
 
 
 
 ---context:node # following code refers to node tags
 
-# Parameter für Knotenpunkte
-# Kosten an Knotenpunkten in Meter
+# parameters for nodes
+# cost at nodes in meters
 
 
-assign defaultaccess = (
-    switch
+assign defaultaccess = 
+    ( switch
         access= 1 # add default barrier restrictions here!
         switch ( or access=private access=no ) 0
         1
-)
+    )
 
 
-assign bikeaccess = (
-    or
+assign bikeaccess  = 
+    ( or
         nodeaccessgranted=yes
-        ( switch
+        ( switch 
             bicycle=
-            ( switch
+            ( switch 
                 vehicle=
                 defaultaccess
                 ( switch
@@ -667,15 +689,15 @@ assign bikeaccess = (
                 )
             )
             ( switch
-                ( or
-                    bicycle=private
-                    ( and
+                ( or 
+                    bicycle=private 
+                    ( and 
                         not ( or
-                            highway=crossing
-                            ignore_bicycle_no
+                            highway=crossing 
+                            ignore_bicycle_no 
                         )
                         ( or
-                            bicycle=no
+                            bicycle=no 
                             bicycle=dismount
                         )
                     )
@@ -684,11 +706,11 @@ assign bikeaccess = (
                 1
             )
         )
-)
+    )
 
 
-assign footaccess = (
-    or
+assign footaccess = 
+    ( or 
         bicycle=dismount
         ( switch
             foot=
@@ -699,34 +721,35 @@ assign footaccess = (
                 1
             )
         )
-)
+    )
 
 
-assign initialcost =
-    add
+assign initialcost = 
+    add 
     (
-        switch highway=elevator                1600 # Kosten für Fahrstuhl z.B. Antwerpen Schelde Ost-West
-        switch highway=traffic_signals          250 # Kosten für Ampel
-        switch highway=stop                     200 # Kosten für Stoppschild
-        switch highway=give_way                 100 # Kosten für Vorfahrt gewähren
-        switch highway=crossing                  10 # Kosten für Vorfahrt gewähren
-        switch railway=crossing|level_crossing  350 # Kosten für Bahnübergang
-        switch highway=steps                        # Kosten für Stufe
-            ( switch
-                no_steps
-                1000000
+        switch highway=elevator               1600 # cost for elevator, e.g. Antwerp Schelde east-west
+        switch highway=traffic_signals         250 # cost for traffic lights
+        switch highway=stop                    200 # cost for stop sign
+        switch highway=give_way                100 # cost for give way
+        switch highway=crossing                 10 # cost for crossing
+        switch railway=crossing|level_crossing 350 # cost for railway crossing
+        switch highway=steps                       # cost for steps
+            ( switch 
+                no_steps 
+                1000000 
                 dismount_cost
             )
-        switch barrier=bollard                   10 # Kosten für Pfosten
-        switch barrier=cycle_barrier|debris|gate|motorcycle_barrier|yes 50 # Kosten für Barrieren
+        switch barrier=bollard                  10 # cost for bollard
+        switch barrier=cycle_barrier|debris|gate|motorcycle_barrier|yes 50 # cost for barriers
+        switch ford=yes                ford_node_cost # ford as a node: one-time cost
         0
     )
-    ( switch
+    ( switch 
         bikeaccess
-        0
-        ( switch
+        0 
+        ( switch 
             footaccess
-            dismount_cost # Kosten fürs Aussteigen
-            1000000       # Kosten für verbotene oder private Wege
+            dismount_cost # cost for dismounting
+            1000000       # cost for forbidden or private ways
         )
     )
